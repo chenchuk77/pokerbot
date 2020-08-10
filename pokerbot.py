@@ -13,7 +13,12 @@ Send /start to initiate the conversation.
 Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
+
+# local python resources
 import credentials
+import db
+from db import Record
+
 import logging
 
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
@@ -26,71 +31,113 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-CLUB, PHOTO, LOCATION, BIO = range(4)
+# GENDER, PHOTO, LOCATION, BIO = range(4)
+CLUB, ACTION, AMOUNT, BIO = range(4)
 
 
 def start(update, context):
     reply_keyboard = [
-        ['Ultimate', 'poker24/7', 'LionKing'],
-        [ 'DragonBall', 'The Monkeys', 'Rounders'],
-        ['poxi', '7xl']
+        ['ultimate', 'poker247', 'lionking'],
+        [ 'monkeys', 'dragonball', 'rounders'],
+        ['poxi', '7xl', 'pokernuts']
     ]
 
     update.message.reply_text(
         'Choose a club to update balance:\n\n',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
 
+#    record = Record.get(Record.club == update.message.reply_text)
+    for record in Record.select():
+        print(record.club)
+
     return CLUB
 
 
 def club(update, context):
+    reply_keyboard = [
+        ['update', 'done']
+    ]
+
     user = update.message.from_user
     logger.info("%s choose club: %s", user.first_name, update.message.text)
-    update.message.reply_text('I see! Please send me a photo of yourself, '
-                              'so I know what you look like, or send /skip if you don\'t want to.',
-                              reply_markup=ReplyKeyboardRemove())
 
-    return PHOTO
+    last_club_record = Record.select().where(Record.club == update.message.text).order_by(Record.date.desc()).get()
+    logger.info("%s balance: %s. [%s]", update.message.text, last_club_record.balance,last_club_record.date)
 
+    message = "Club: {} \nDate: {}\nBalance: {}\n\n".format(update.message.text, str(last_club_record.date), str(last_club_record.balance))
+    update.message.reply_text(message,
+                              reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
 
-def photo(update, context):
+    return ACTION
+
+def update_balance(update, context):
     user = update.message.from_user
-    photo_file = update.message.photo[-1].get_file()
-    photo_file.download('user_photo.jpg')
-    logger.info("Photo of %s: %s", user.first_name, 'user_photo.jpg')
-    update.message.reply_text('Gorgeous! Now, send me your location please, '
-                              'or send /skip if you don\'t want to.')
-
-    return LOCATION
+    logger.info("requesting user amount.")
+    update.message.reply_text('type the current balance:\n')
+    return AMOUNT
 
 
-def skip_photo(update, context):
+# def photo(update, context):
+#     user = update.message.from_user
+#     photo_file = update.message.photo[-1].get_file()
+#     photo_file.download('user_photo.jpg')
+#     logger.info("Photo of %s: %s", user.first_name, 'user_photo.jpg')
+#     update.message.reply_text('Gorgeous! Now, send me your location please, '
+#                               'or send /skip if you don\'t want to.')
+#
+#     return LOCATION
+
+def skip_update_balance(update, context):
     user = update.message.from_user
     logger.info("User %s did not send a photo.", user.first_name)
     update.message.reply_text('I bet you look great! Now, send me your location please, '
                               'or send /skip.')
 
-    return LOCATION
+    return CLUB
+#
+# def skip_photo(update, context):
+#     user = update.message.from_user
+#     logger.info("User %s did not send a photo.", user.first_name)
+#     update.message.reply_text('I bet you look great! Now, send me your location please, '
+#                               'or send /skip.')
+#
+#     return LOCATION
 
 
-def location(update, context):
+def amount(update, context):
     user = update.message.from_user
-    user_location = update.message.location
-    logger.info("Location of %s: %f / %f", user.first_name, user_location.latitude,
-                user_location.longitude)
+    amount = update.message.text
+    logger.info("amount typed: %s", amount)
     update.message.reply_text('Maybe I can visit you sometime! '
                               'At last, tell me something about yourself.')
 
+    print ("TODO: add record to DB")
     return BIO
+# def location(update, context):
+#     user = update.message.from_user
+#     user_location = update.message.location
+#     logger.info("Location of %s: %f / %f", user.first_name, user_location.latitude,
+#                 user_location.longitude)
+#     update.message.reply_text('Maybe I can visit you sometime! '
+#                               'At last, tell me something about yourself.')
+#
+#     return BIO
 
 
-def skip_location(update, context):
+def skip_amount(update, context):
     user = update.message.from_user
     logger.info("User %s did not send a location.", user.first_name)
     update.message.reply_text('You seem a bit paranoid! '
                               'At last, tell me something about yourself.')
 
     return BIO
+# def skip_location(update, context):
+#     user = update.message.from_user
+#     logger.info("User %s did not send a location.", user.first_name)
+#     update.message.reply_text('You seem a bit paranoid! '
+#                               'At last, tell me something about yourself.')
+#
+#     return BIO
 
 
 def bio(update, context):
@@ -111,6 +158,10 @@ def cancel(update, context):
 
 
 def main():
+
+    db.init()
+    logger.info("db initialized. ")
+
     token = credentials.token
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
@@ -128,11 +179,15 @@ def main():
             #GENDER: [MessageHandler(Filters.regex('^(Boy|Girl|Other)$'), gender)],
             CLUB: [MessageHandler(Filters.all, club)],
 
-            PHOTO: [MessageHandler(Filters.photo, photo),
-                    CommandHandler('skip', skip_photo)],
+            # PHOTO: [MessageHandler(Filters.photo, photo),
+            #         CommandHandler('skip', skip_photo)],
+            ACTION: [MessageHandler(Filters.all, update_balance),
+                    CommandHandler('skip', skip_update_balance)],
 
-            LOCATION: [MessageHandler(Filters.location, location),
-                       CommandHandler('skip', skip_location)],
+            # LOCATION: [MessageHandler(Filters.location, location),
+            #            CommandHandler('skip', skip_location)],
+            AMOUNT: [MessageHandler(Filters.all, amount),
+                       CommandHandler('skip', skip_amount)],
 
             BIO: [MessageHandler(Filters.text & ~Filters.command, bio)]
         },
