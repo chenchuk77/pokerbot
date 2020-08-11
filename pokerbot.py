@@ -15,6 +15,8 @@ bot.
 """
 
 # local python resources
+from datetime import date
+
 import credentials
 import db
 from db import Record
@@ -31,7 +33,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-# GENDER, PHOTO, LOCATION, BIO = range(4)
+# states
 CLUB, ACTION, AMOUNT, BIO = range(4)
 
 
@@ -62,6 +64,7 @@ def club(update, context):
     logger.info("%s choose club: %s", user.first_name, update.message.text)
 
     last_club_record = Record.select().where(Record.club == update.message.text).order_by(Record.date.desc()).get()
+    context.user_data['last_club_record'] = last_club_record
     logger.info("%s balance: %s. [%s]", update.message.text, last_club_record.balance,last_club_record.date)
 
     message = "Club: {} \nDate: {}\nBalance: {}\n\n".format(update.message.text, str(last_club_record.date), str(last_club_record.balance))
@@ -73,7 +76,7 @@ def club(update, context):
 def update_balance(update, context):
     user = update.message.from_user
     logger.info("requesting user amount.")
-    update.message.reply_text('type the current balance:\n')
+    update.message.reply_text('Type the current balance: \n')
     return AMOUNT
 
 
@@ -104,14 +107,20 @@ def skip_update_balance(update, context):
 #     return LOCATION
 
 
-def amount(update, context):
+def balance(update, context):
     user = update.message.from_user
-    amount = update.message.text
-    logger.info("amount typed: %s", amount)
-    update.message.reply_text('Maybe I can visit you sometime! '
+    new_balance = update.message.text
+
+    # get the record from the context
+    old_record = context.user_data['last_club_record']
+
+    logger.info("adding record. [club: {}, balance {}] (old-balance: {})".format(old_record.club, new_balance, old_record.balance))
+    new_record = Record.create(club=old_record.club, date=date.today(), balance=new_balance)
+    new_record.save()
+
+    update.message.reply_text('record added... '
                               'At last, tell me something about yourself.')
 
-    print ("TODO: add record to DB")
     return BIO
 # def location(update, context):
 #     user = update.message.from_user
@@ -124,7 +133,7 @@ def amount(update, context):
 #     return BIO
 
 
-def skip_amount(update, context):
+def skip_balance(update, context):
     user = update.message.from_user
     logger.info("User %s did not send a location.", user.first_name)
     update.message.reply_text('You seem a bit paranoid! '
@@ -186,10 +195,11 @@ def main():
 
             # LOCATION: [MessageHandler(Filters.location, location),
             #            CommandHandler('skip', skip_location)],
-            AMOUNT: [MessageHandler(Filters.all, amount),
-                       CommandHandler('skip', skip_amount)],
+            AMOUNT: [MessageHandler(Filters.all, balance),
+                       CommandHandler('skip', skip_balance)],
 
-            BIO: [MessageHandler(Filters.text & ~Filters.command, bio)]
+            # BIO: [MessageHandler(Filters.text & ~Filters.command, bio)]
+            BIO: [MessageHandler(Filters.all, bio)]
         },
 
         fallbacks=[CommandHandler('cancel', cancel)]
