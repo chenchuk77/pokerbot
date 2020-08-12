@@ -15,11 +15,12 @@ bot.
 """
 
 # local python resources
-# from datetime import date
-import datetime
-
 import credentials
 import db
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import numpy as np
+
 from db import Record
 from prettytable import PrettyTable
 
@@ -71,6 +72,21 @@ def start(update, context):
     return CLUB
 
 
+def generate_graph(club_name):
+    dates = []
+    balances = []
+    query = Record.select().where(Record.club == club_name).order_by(Record.date).execute()
+    club_records = list(query)
+    for record in club_records:
+        dates.append(record.date)
+        balances.append(record.balance)
+    x = np.array(dates)
+    y = np.array(balances)
+    plt.plot(x,y)
+    # plt.show()
+    plt.savefig('graph-{}.png'.format(club_name))
+
+
 def club(update, context):
     reply_keyboard = [
         ['update', 'cancel']
@@ -83,6 +99,7 @@ def club(update, context):
         for club in clubs:
             last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
             table.add_row([club, last_record.balance, str(last_record.date)[:-7]])
+            generate_graph(club)
         message = "```" + str(table) + "```"
         message += '\npress /start to start over.'
         update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)

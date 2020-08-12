@@ -2,3 +2,35 @@
     for record in Record.select():
         print(record.club)
 
+
+working:
+import matplotlib.pyplot as plt
+plt.plot([(1,3), (2,3), (3,6), (4,8)])
+plt.ylabel('some numbers')
+plt.show()
+plt.savefig('testplot.png')
+
+Record.create(club='poker247',    date=datetime.datetime(2020, 7, 22, 17, 0, 0), balance=500)
+datetime.datetime.now()
+
+
+from datetime import datetime, timedelta
+
+the3 = datetime(2020, 8, 3, 21, 44, 14, 375424)
+the5 = datetime(2020, 8, 5, 21, 44, 14, 375424)
+the8 = datetime(2020, 8, 8, 21, 44, 14, 375424)
+
+datetime.now() - the3
+datetime.timedelta(8, 86339, 163802).days
+
+
+working:
+import matplotlib.pyplot as plt
+import datetime
+import numpy as np
+
+x = np.array([datetime.datetime(2013, 9, 28, i, 0) for i in range(24)])
+y = np.random.randint(100, size=x.shape)
+
+plt.plot(x,y)
+plt.show()
