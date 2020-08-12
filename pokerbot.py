@@ -15,14 +15,16 @@ bot.
 """
 
 # local python resources
-from datetime import date
+# from datetime import date
+import datetime
 
 import credentials
 import db
 from db import Record
+from prettytable import PrettyTable
 
 import logging
-
+from telegram import ParseMode
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           ConversationHandler)
@@ -33,78 +35,97 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-# states
-CLUB, ACTION, AMOUNT, BIO = range(4)
+# States
+CLUB, ACTION, BALANCE, END = range(4)
 
+clubs1 = ['ultimate', 'poker247', 'lionking']
+clubs2 = ['monkeys', 'dragonball', 'rounders']
+clubs3 = ['poxi', '7xl', 'pokernuts']
+clubs = clubs1 + clubs2 + clubs3
+
+action_buttons = ['summary', 'reports']
+
+
+#clubs = ['ultimate', 'poker247', 'lionking', 'monkeys', 'dragonball', 'rounders', 'poxi', '7xl', 'pokernuts']
+
+
+# def start(update, context):
+#     # reply_keyboard = [
+#     #     ['ultimate', 'poker247', 'lionking'],
+#     #     ['monkeys', 'dragonball', 'rounders'],
+#     #     ['poxi', '7xl', 'pokernuts']
+#     # ]
+#     reply_keyboard = [ clubs1, clubs2, clubs3 ]
+#     update.message.reply_text(
+#         'Choose a club to update balance:\n\n',
+#         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+#     return CLUB
+#
 
 def start(update, context):
-    reply_keyboard = [
-        ['ultimate', 'poker247', 'lionking'],
-        [ 'monkeys', 'dragonball', 'rounders'],
-        ['poxi', '7xl', 'pokernuts']
-    ]
 
+    reply_keyboard = [ clubs1, clubs2, clubs3, action_buttons ]
     update.message.reply_text(
         'Choose a club to update balance:\n\n',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
-
-#    record = Record.get(Record.club == update.message.reply_text)
-    for record in Record.select():
-        print(record.club)
-
     return CLUB
 
 
 def club(update, context):
     reply_keyboard = [
-        ['update', 'done']
+        ['update', 'cancel']
     ]
+    msg = ""
 
+    if update.message.text == 'summary':
+        table = PrettyTable()
+        table.field_names = ["Club", "Balance", "Updated"]
+        for club in clubs:
+            last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
+            table.add_row([club, last_record.balance, str(last_record.date)[:-7]])
+        message = "```" + str(table) + "```"
+        message += '\npress /start to start over.'
+        update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+        return ConversationHandler.END
+
+    else:
+
+        user = update.message.from_user
+        logger.info("%s choose club: %s", user.first_name, update.message.text)
+
+        last_club_record = Record.select().where(Record.club == update.message.text).order_by(Record.date.desc()).get()
+        context.user_data['last_club_record'] = last_club_record
+        logger.info("%s balance: %s. [%s]", update.message.text, last_club_record.balance, last_club_record.date)
+
+        message = "Club: {} \nDate: {}\nBalance: {}\n\n".format(update.message.text, str(last_club_record.date),
+                                                                str(last_club_record.balance))
+        update.message.reply_text(message,
+                                  reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+        return ACTION
+
+
+def action(update, context):
     user = update.message.from_user
-    logger.info("%s choose club: %s", user.first_name, update.message.text)
 
-    last_club_record = Record.select().where(Record.club == update.message.text).order_by(Record.date.desc()).get()
-    context.user_data['last_club_record'] = last_club_record
-    logger.info("%s balance: %s. [%s]", update.message.text, last_club_record.balance,last_club_record.date)
-
-    message = "Club: {} \nDate: {}\nBalance: {}\n\n".format(update.message.text, str(last_club_record.date), str(last_club_record.balance))
-    update.message.reply_text(message,
-                              reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
-
-    return ACTION
-
-def update_balance(update, context):
-    user = update.message.from_user
-    logger.info("requesting user amount.")
-    update.message.reply_text('Type the current balance: \n')
-    return AMOUNT
+    if update.message.text == 'update':
+        logger.info("update chosen. requesting user amount.")
+        update.message.reply_text(
+            'Type the current balance for {}: \n'.format(context.user_data['last_club_record'].club))
+        return BALANCE
+    else:
+        logger.info("cancel chosen. exiting to BIO.")
+        update.message.reply_text('canceled. press /start to start again\n')
+        # return BIO
+        return ConversationHandler.END
 
 
-# def photo(update, context):
-#     user = update.message.from_user
-#     photo_file = update.message.photo[-1].get_file()
-#     photo_file.download('user_photo.jpg')
-#     logger.info("Photo of %s: %s", user.first_name, 'user_photo.jpg')
-#     update.message.reply_text('Gorgeous! Now, send me your location please, '
-#                               'or send /skip if you don\'t want to.')
-#
-#     return LOCATION
-
-def skip_update_balance(update, context):
+def skip_action(update, context):
     user = update.message.from_user
     logger.info("User %s did not send a photo.", user.first_name)
     update.message.reply_text('I bet you look great! Now, send me your location please, '
                               'or send /skip.')
 
     return CLUB
-#
-# def skip_photo(update, context):
-#     user = update.message.from_user
-#     logger.info("User %s did not send a photo.", user.first_name)
-#     update.message.reply_text('I bet you look great! Now, send me your location please, '
-#                               'or send /skip.')
-#
-#     return LOCATION
 
 
 def balance(update, context):
@@ -114,23 +135,19 @@ def balance(update, context):
     # get the record from the context
     old_record = context.user_data['last_club_record']
 
-    logger.info("adding record. [club: {}, balance {}] (old-balance: {})".format(old_record.club, new_balance, old_record.balance))
-    new_record = Record.create(club=old_record.club, date=date.today(), balance=new_balance)
+    logger.info("adding record. [club: {}, balance: {}] (old-balance: {})".format(old_record.club, new_balance,
+                                                                                  old_record.balance))
+    new_record = Record.create(club=old_record.club, date=datetime.datetime.now(), balance=new_balance)
     new_record.save()
 
-    update.message.reply_text('record added... '
-                              'At last, tell me something about yourself.')
+    message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(new_record.club,
+                                                                                         str(new_record.date),
+                                                                                         str(new_record.balance))
 
-    return BIO
-# def location(update, context):
-#     user = update.message.from_user
-#     user_location = update.message.location
-#     logger.info("Location of %s: %f / %f", user.first_name, user_location.latitude,
-#                 user_location.longitude)
-#     update.message.reply_text('Maybe I can visit you sometime! '
-#                               'At last, tell me something about yourself.')
-#
-#     return BIO
+    update.message.reply_text(message)
+
+    #return END
+    return ConversationHandler.END
 
 
 def skip_balance(update, context):
@@ -139,18 +156,15 @@ def skip_balance(update, context):
     update.message.reply_text('You seem a bit paranoid! '
                               'At last, tell me something about yourself.')
 
-    return BIO
-# def skip_location(update, context):
-#     user = update.message.from_user
-#     logger.info("User %s did not send a location.", user.first_name)
-#     update.message.reply_text('You seem a bit paranoid! '
-#                               'At last, tell me something about yourself.')
-#
-#     return BIO
+    return END
 
 
-def bio(update, context):
+def end(update, context):
     user = update.message.from_user
+    logger.info("User %s reach the END state.", user.first_name)
+    update.message.reply_text('Done\n. press /start to start again\n')
+    return ConversationHandler.END
+
     logger.info("Bio of %s: %s", user.first_name, update.message.text)
     update.message.reply_text('Thank you! I hope we can talk again some day.')
 
@@ -167,7 +181,6 @@ def cancel(update, context):
 
 
 def main():
-
     db.init()
     logger.info("db initialized. ")
 
@@ -185,21 +198,18 @@ def main():
         entry_points=[CommandHandler('start', start)],
 
         states={
-            #GENDER: [MessageHandler(Filters.regex('^(Boy|Girl|Other)$'), gender)],
-            CLUB: [MessageHandler(Filters.all, club)],
+            # CLUB: [MessageHandler(Filters.all, club)],
+            CLUB: [MessageHandler(Filters.text(clubs + action_buttons), club)],
 
-            # PHOTO: [MessageHandler(Filters.photo, photo),
-            #         CommandHandler('skip', skip_photo)],
-            ACTION: [MessageHandler(Filters.all, update_balance),
-                    CommandHandler('skip', skip_update_balance)],
+            # ACTION: [MessageHandler(Filters.all, action),
+            #          CommandHandler('skip', skip_action)],
+            ACTION: [MessageHandler(Filters.text(['update','cancel']), action),
+                     CommandHandler('skip', skip_action)],
 
-            # LOCATION: [MessageHandler(Filters.location, location),
-            #            CommandHandler('skip', skip_location)],
-            AMOUNT: [MessageHandler(Filters.all, balance),
-                       CommandHandler('skip', skip_balance)],
+            BALANCE: [MessageHandler(Filters.all, balance),
+                      CommandHandler('skip', skip_balance)],
 
-            # BIO: [MessageHandler(Filters.text & ~Filters.command, bio)]
-            BIO: [MessageHandler(Filters.all, bio)]
+            END: [MessageHandler(Filters.all, end)]
         },
 
         fallbacks=[CommandHandler('cancel', cancel)]

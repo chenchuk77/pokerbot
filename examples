@@ -1,0 +1,4 @@
+    #    record = Record.get(Record.club == update.message.reply_text)
+    for record in Record.select():
+        print(record.club)
+
