@@ -17,7 +17,7 @@ bot.
 # local python resources
 import credentials
 import db
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -28,7 +28,7 @@ import logging
 from telegram import ParseMode
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler)
+                          ConversationHandler, JobQueue)
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -47,25 +47,8 @@ clubs = clubs1 + clubs2 + clubs3
 action_buttons = ['summary', 'reports']
 
 
-#clubs = ['ultimate', 'poker247', 'lionking', 'monkeys', 'dragonball', 'rounders', 'poxi', '7xl', 'pokernuts']
-
-
-# def start(update, context):
-#     # reply_keyboard = [
-#     #     ['ultimate', 'poker247', 'lionking'],
-#     #     ['monkeys', 'dragonball', 'rounders'],
-#     #     ['poxi', '7xl', 'pokernuts']
-#     # ]
-#     reply_keyboard = [ clubs1, clubs2, clubs3 ]
-#     update.message.reply_text(
-#         'Choose a club to update balance:\n\n',
-#         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
-#     return CLUB
-#
-
 def start(update, context):
-
-    reply_keyboard = [ clubs1, clubs2, clubs3, action_buttons ]
+    reply_keyboard = [clubs1, clubs2, clubs3, action_buttons]
     update.message.reply_text(
         'Choose a club to update balance:\n\n',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
@@ -82,9 +65,102 @@ def generate_graph(club_name):
         balances.append(record.balance)
     x = np.array(dates)
     y = np.array(balances)
-    plt.plot(x,y)
+    plt.plot(x, y)
     # plt.show()
     plt.savefig('graph-{}.png'.format(club_name))
+
+
+def generate_graph3(club_name, until, days_count):
+    since = until - timedelta(days=days_count)
+    # temp dict to hold db records
+    dates_balances = {}
+    # some dates/balances will not appear in result, we fill the missing values
+    dates = []
+    balances = []
+    query = Record.select().where(
+        (Record.club == club_name) & (Record.date >= since) & (Record.date <= until)).order_by(Record.date).execute()
+    club_records = list(query)
+    for record in club_records:
+        dates_balances[record.date] = record.balance
+
+    last_balance = 0 # TODO: find init x if no init balance in this date
+    for single_date in (since + timedelta(n) for n in range(days_count)):
+        dates.append(single_date)
+        if single_date in dates_balances.keys():
+            balances.append(dates_balances[single_date])
+        else:
+            # if no balance at this date, we assume the last balance is correct
+            balances.append(last_balance)
+
+
+def generate_graph2(club_name, since, until):
+    dates = []
+    balances = []
+    query = Record.select().where(
+        (Record.club == club_name) & (Record.date >= since) & (Record.date <= until)).order_by(Record.date).execute()
+    club_records = list(query)
+    for record in club_records:
+        dates.append(record.date)
+        balances.append(record.balance)
+    x = np.array(dates)
+    y = np.array(balances)
+    plt.plot(x, y)
+    # plt.show()
+    plt.savefig('graph-{}.png'.format(club_name))
+
+
+def generate_graph4(club_name, until, days_count):
+    since = until - timedelta(days=days_count)
+
+    # this is the newest club balance until a given date.
+    # def get_last_balance(club, until):
+    def get_last_balance():
+        return Record.select(Record.balance).where((Record.club == club_name) & (Record.date <= until) & (Record.date >= since-timedelta(days=1))).order_by(Record.date).execute()[0].balance
+
+    # generates all dates in a range
+    def daterange(start_date, end_date):
+        for n in range(int((end_date - start_date).days)):
+            yield start_date + timedelta(n)
+
+    # create an empty list of strings for all dates in range
+    all_dates = []
+    for single_date in daterange(since.date(), until.date()+timedelta(days=1)):
+        print(single_date.strftime("%Y-%m-%d"))
+        all_dates.append(single_date.strftime("%Y-%m-%d"))
+
+    # create dict with balances from existing records only
+    balances_partial = {}
+    last = get_last_balance()
+    query = Record.select().where(
+        (Record.club == club_name) & (Record.date >= since-timedelta(days=1)) & (Record.date <= until)).order_by(Record.date).execute()
+    club_records = list(query)
+    for record in club_records:
+        date_string = record.date.date().strftime("%Y-%m-%d")
+        balances_partial[date_string] = record.balance
+
+    # create final dict, filling the missing gaps with last values
+    all_balances = {}
+    for date_string in all_dates:
+        if date_string in balances_partial.keys():
+            last = balances_partial[date_string]
+            all_balances[date_string] = balances_partial[date_string]
+        else:
+            all_balances[date_string] = last
+
+    # summary_balances = [a + b for a, b in zip(list1, list2)]
+
+    # x = np.array(all_dates)
+    # y = np.array(all_balances)
+    plt.plot(*zip(*all_balances.items()))
+    # plt.show()
+    plt.savefig('graph-new-{}.png'.format(club_name))
+
+
+
+
+
+    # return all_balances
+    return 0
 
 
 def club(update, context):
@@ -99,7 +175,9 @@ def club(update, context):
         for club in clubs:
             last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
             table.add_row([club, last_record.balance, str(last_record.date)[:-7]])
-            generate_graph(club)
+            # generate_graph2(club, datetime.now() - timedelta(days=3),datetime.now())
+            #generate_graph3(club, datetime.now(), 2)
+            generate_graph4(club, datetime.now(), 2)
         message = "```" + str(table) + "```"
         message += '\npress /start to start over.'
         update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
@@ -154,7 +232,7 @@ def balance(update, context):
 
     logger.info("adding record. [club: {}, balance: {}] (old-balance: {})".format(old_record.club, new_balance,
                                                                                   old_record.balance))
-    new_record = Record.create(club=old_record.club, date=datetime.datetime.now(), balance=new_balance)
+    new_record = Record.create(club=old_record.club, type='update', date=datetime.datetime.now(), balance=new_balance)
     new_record.save()
 
     message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(new_record.club,
@@ -163,7 +241,7 @@ def balance(update, context):
 
     update.message.reply_text(message)
 
-    #return END
+    # return END
     return ConversationHandler.END
 
 
@@ -197,6 +275,10 @@ def cancel(update, context):
     return ConversationHandler.END
 
 
+def add_daily_record():
+    print('TODO::add daily record at 23:59')
+
+
 def main():
     db.init()
     logger.info("db initialized. ")
@@ -220,7 +302,7 @@ def main():
 
             # ACTION: [MessageHandler(Filters.all, action),
             #          CommandHandler('skip', skip_action)],
-            ACTION: [MessageHandler(Filters.text(['update','cancel']), action),
+            ACTION: [MessageHandler(Filters.text(['update', 'cancel']), action),
                      CommandHandler('skip', skip_action)],
 
             BALANCE: [MessageHandler(Filters.all, balance),
@@ -236,6 +318,10 @@ def main():
 
     # Start the Bot
     updater.start_polling()
+
+    # q = updater.job_queue
+    # q.run_daily(add_daily_record(), time(hour=10, minute=10, second=10), context=None, name=None)
+    # q.run_daily(add_daily_record(), time(hour = 10, minute = 10, second = 10), context=None, name=None)
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since

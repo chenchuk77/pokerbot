@@ -11,6 +11,7 @@ db = SqliteDatabase('poker.db')
 # model is a table
 class Record(Model):
     club = CharField()
+    type = CharField()
     # date = DateField()
     date = DateTimeField(default=datetime.now)
     balance = IntegerField()
@@ -22,19 +23,19 @@ class Record(Model):
 def init():
     db.connect()
     db.create_tables([Record])
-    init_balance = {'ultimate': generate_series(500, 'win'),
-                    'poker247': generate_series(500, 'win'),
-                    'lionking': generate_series(800, 'win'),
-                    'monkeys': generate_series(500, 'lose'),
-                    'dragonball': generate_series(500, 'random'),
-                    'rounders': generate_series(0, 'zeros'),
-                    'poxi': generate_series(1000, 'lose'),
-                    '7xl': generate_series(100, 'lose'),
-                    'pokernuts': generate_series(1000, 'random')
+    init_balance = {'ultimate':   generate_series(500,  'win'),
+                    'poker247':   generate_series(500,  'win'),
+                    'lionking':   generate_series(800,  'win'),
+                    'monkeys':    generate_series(500,  'lose'),
+                    'dragonball': generate_series(500,  'random'),
+                    'rounders':   generate_series(000,  'zeros'),
+                    'poxi':       generate_series(1000, 'lose'),
+                    '7xl':        generate_series(100,  'lose'),
+                    'pokernuts':  generate_series(1000, 'random')
                     }
     for i in range(9, -1, -1):
         for club, balances in init_balance.items():
-            r = Record.create(club=club, date=datetime.now() - timedelta(days=i), balance=balances[9 - i])
+            r = Record.create(club=club, type='init', date=datetime.now() - timedelta(days=i), balance=balances[9 - i])
             r.save()
 
 
