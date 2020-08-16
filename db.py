@@ -20,9 +20,21 @@ class Record(Model):
         database = db  # This model uses the "poker.db" database.
 
 
-def init():
-    db.connect()
-    db.create_tables([Record])
+# inject file of real records that created by the show-records.sh script
+def inject_records(file):
+    records = open(file).readlines()
+    for record in records:
+        #print(record)
+        # example: ['9', 'pokernuts', 'init', '2020-08-07 21:54:55.149959', '1001']
+        r = record.split('|')
+        r_club = r[1]
+        r_type = r[2]
+        r_date = datetime.strptime(r[3].split('.')[0], '%Y-%m-%d %H:%M:%S')
+        r_balance = r[4]
+        r = Record.create(club=r_club, type=r_type, date=r_date, balance=r_balance)
+        r.save()
+
+def inject_test_records():
     init_balance = {'ultimate':   generate_series(500,  'win'),
                     'poker247':   generate_series(500,  'win'),
                     'lionking':   generate_series(800,  'win'),
@@ -37,6 +49,13 @@ def init():
         for club, balances in init_balance.items():
             r = Record.create(club=club, type='init', date=datetime.now() - timedelta(days=i), balance=balances[9 - i])
             r.save()
+
+
+def init():
+    db.connect()
+    db.create_tables([Record])
+    inject_records('db-init')
+    #inject_test_records()
 
 
 def generate_series(start_value, type='random'):

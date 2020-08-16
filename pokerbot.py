@@ -55,66 +55,10 @@ def start(update, context):
     return CLUB
 
 
-def generate_graph(club_name):
-    dates = []
-    balances = []
-    query = Record.select().where(Record.club == club_name).order_by(Record.date).execute()
-    club_records = list(query)
-    for record in club_records:
-        dates.append(record.date)
-        balances.append(record.balance)
-    x = np.array(dates)
-    y = np.array(balances)
-    plt.plot(x, y)
-    # plt.show()
-    plt.savefig('graph-{}.png'.format(club_name))
-
-
-def generate_graph3(club_name, until, days_count):
-    since = until - timedelta(days=days_count)
-    # temp dict to hold db records
-    dates_balances = {}
-    # some dates/balances will not appear in result, we fill the missing values
-    dates = []
-    balances = []
-    query = Record.select().where(
-        (Record.club == club_name) & (Record.date >= since) & (Record.date <= until)).order_by(Record.date).execute()
-    club_records = list(query)
-    for record in club_records:
-        dates_balances[record.date] = record.balance
-
-    last_balance = 0 # TODO: find init x if no init balance in this date
-    for single_date in (since + timedelta(n) for n in range(days_count)):
-        dates.append(single_date)
-        if single_date in dates_balances.keys():
-            balances.append(dates_balances[single_date])
-        else:
-            # if no balance at this date, we assume the last balance is correct
-            balances.append(last_balance)
-
-
-def generate_graph2(club_name, since, until):
-    dates = []
-    balances = []
-    query = Record.select().where(
-        (Record.club == club_name) & (Record.date >= since) & (Record.date <= until)).order_by(Record.date).execute()
-    club_records = list(query)
-    for record in club_records:
-        dates.append(record.date)
-        balances.append(record.balance)
-    x = np.array(dates)
-    y = np.array(balances)
-    plt.plot(x, y)
-    # plt.show()
-    plt.savefig('graph-{}.png'.format(club_name))
-
-
-def generate_graph4(club_name, until, days_count):
+def get_club_balances(club_name, until, days_count):
     since = until - timedelta(days=days_count)
 
-    # this is the newest club balance until a given date.
-    # def get_last_balance(club, until):
-    def get_last_balance():
+    def get_last_club_balance():
         return Record.select(Record.balance).where((Record.club == club_name) & (Record.date <= until) & (Record.date >= since-timedelta(days=1))).order_by(Record.date).execute()[0].balance
 
     # generates all dates in a range
@@ -130,7 +74,7 @@ def generate_graph4(club_name, until, days_count):
 
     # create dict with balances from existing records only
     balances_partial = {}
-    last = get_last_balance()
+    last = get_last_club_balance()
     query = Record.select().where(
         (Record.club == club_name) & (Record.date >= since-timedelta(days=1)) & (Record.date <= until)).order_by(Record.date).execute()
     club_records = list(query)
@@ -147,20 +91,29 @@ def generate_graph4(club_name, until, days_count):
         else:
             all_balances[date_string] = last
 
-    # summary_balances = [a + b for a, b in zip(list1, list2)]
+    return all_balances
 
-    # x = np.array(all_dates)
-    # y = np.array(all_balances)
-    plt.plot(*zip(*all_balances.items()))
+
+# plot a given dict of balances (club / summary)
+def plot_balances(title, balances_dict):
+    plt.plot(*zip(*balances_dict.items()))
     # plt.show()
-    plt.savefig('graph-new-{}.png'.format(club_name))
+    plt.savefig('xxx-{}.png'.format(title))
 
 
+# plot specific club
+def plot_club(club, until, days_count):
+    balances = get_club_balances(club, until, days_count)
+    plot_balances(club, balances)
 
 
-
-    # return all_balances
-    return 0
+# summarize a list of dict values
+def plot_all_clubs(until, days_count):
+    all_balances = []
+    for club in clubs:
+        all_balances.append(get_club_balances(club, until, days_count))
+    summary_balances = {k: sum(d[k] for d in all_balances) for k in all_balances[0]}
+    plot_balances('summary', summary_balances)
 
 
 def club(update, context):
@@ -175,9 +128,8 @@ def club(update, context):
         for club in clubs:
             last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
             table.add_row([club, last_record.balance, str(last_record.date)[:-7]])
-            # generate_graph2(club, datetime.now() - timedelta(days=3),datetime.now())
-            #generate_graph3(club, datetime.now(), 2)
-            generate_graph4(club, datetime.now(), 2)
+            # plot_club(club, datetime.now(), 2)
+            plot_all_clubs(datetime.now(), 2)
         message = "```" + str(table) + "```"
         message += '\npress /start to start over.'
         update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
@@ -232,7 +184,7 @@ def balance(update, context):
 
     logger.info("adding record. [club: {}, balance: {}] (old-balance: {})".format(old_record.club, new_balance,
                                                                                   old_record.balance))
-    new_record = Record.create(club=old_record.club, type='update', date=datetime.datetime.now(), balance=new_balance)
+    new_record = Record.create(club=old_record.club, type='update', date=datetime.now(), balance=new_balance)
     new_record.save()
 
     message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(new_record.club,
