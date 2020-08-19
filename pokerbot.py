@@ -37,10 +37,10 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # States
-CLUB, ACTION, BALANCE, END = range(4)
+CLUB, REPORTS, ACTION, BALANCE, END = range(5)
 
 clubs1 = ['ultimate', 'poker247', 'lionking']
-clubs2 = ['monkeys', 'dragonball', 'rounders']
+clubs2 = ['monkeys', 'dragonball', 'academy']
 clubs3 = ['poxi', '7xl', 'pokernuts']
 clubs = clubs1 + clubs2 + clubs3
 
@@ -59,7 +59,15 @@ def get_club_balances(club_name, until, days_count):
     since = until - timedelta(days=days_count)
 
     def get_last_club_balance():
-        return Record.select(Record.balance).where((Record.club == club_name) & (Record.date <= until) & (Record.date >= since-timedelta(days=1))).order_by(Record.date).execute()[0].balance
+        #last_balance = Record.select(Record.balance).where((Record.club == club_name) & (Record.date <= until) & (Record.date >= since-timedelta(days=1))).order_by(Record.date).execute()[0].balance
+        # last_balance = Record.select(Record.balance).where(
+        #     (Record.club == club_name) & (Record.date <= since.date() - timedelta(days=1))).order_by(Record.date).execute()[
+        #     0].balance
+        last_balance = Record.select(Record.balance).where(
+            (Record.club == club_name) & (Record.date <= since.date() + timedelta(days=1))).order_by(
+            Record.date).execute()[
+            0].balance
+        return last_balance
 
     # generates all dates in a range
     def daterange(start_date, end_date):
@@ -69,8 +77,10 @@ def get_club_balances(club_name, until, days_count):
     # create an empty list of strings for all dates in range
     all_dates = []
     for single_date in daterange(since.date(), until.date()+timedelta(days=1)):
-        print(single_date.strftime("%Y-%m-%d"))
+        #print(single_date.strftime("%Y-%m-%d"))
+
         all_dates.append(single_date.strftime("%Y-%m-%d"))
+        # logger.info("%s will be plotted.", all_dates)
 
     # create dict with balances from existing records only
     balances_partial = {}
@@ -98,7 +108,7 @@ def get_club_balances(club_name, until, days_count):
 def plot_balances(title, balances_dict):
     plt.plot(*zip(*balances_dict.items()))
     # plt.show()
-    plt.savefig('xxx-{}.png'.format(title))
+    plt.savefig('summary.png'.format(title))
 
 
 # plot specific club
@@ -123,20 +133,19 @@ def club(update, context):
     msg = ""
 
     if update.message.text == 'summary':
-        table = PrettyTable()
-        table.field_names = ["Club", "Balance", "Updated"]
-        for club in clubs:
-            last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
-            table.add_row([club, last_record.balance, str(last_record.date)[:-7]])
-            # plot_club(club, datetime.now(), 2)
-            plot_all_clubs(datetime.now(), 2)
-        message = "```" + str(table) + "```"
-        message += '\npress /start to start over.'
-        update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+        summary(update,context)
         return ConversationHandler.END
 
-    else:
+    elif update.message.text == 'reports':
+        reply_keyboard = [
+            ['Last7Days', 'ThisMonth', 'All']
+        ]
+        update.message.reply_text(
+            'choose report dates:\n\n',
+            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+        return REPORTS
 
+    else:
         user = update.message.from_user
         logger.info("%s choose club: %s", user.first_name, update.message.text)
 
@@ -149,6 +158,73 @@ def club(update, context):
         update.message.reply_text(message,
                                   reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
         return ACTION
+
+
+def summary(update, context):
+    logger.info("non state function summary() called.")
+
+    table = PrettyTable()
+    table.field_names = ["Club", "Balance", "Updated"]
+    for club in clubs:
+        last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
+        table.add_row([club, last_record.balance, str(last_record.date).split('.')[0]])
+        # plot_club(club, datetime.now(), 2)
+        # plot_all_clubs(datetime.now(), 2)
+    message = "```" + str(table) + "```"
+    message += '\npress /start to start over.'
+    update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+    # return ConversationHandler.END
+    return
+
+
+def reports(update, context):
+    logger.info("entering state: REPORTS")
+
+    if update.message.text == 'All':
+        # TODO: find first record dynamicaly
+        #  last_record = Record.select().order_by(Record.date)[0]
+        first_record = datetime(2020, 8, 15).date()
+        today = datetime.today().date()
+        days_diff = (today - first_record).days
+        plot_all_clubs(datetime.now(), days_diff)
+        # plot_all_clubs(datetime.now(), 7)
+        #
+        # for club in clubs:
+        #
+        #     last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
+        #     # plot_club(club, datetime.now(), 2)
+        #     plot_all_clubs(datetime.now(), 7)
+
+    elif update.message.text == 'Last7Days':
+        plot_all_clubs(datetime.now(), 7)
+
+        # for club in clubs:
+        #     last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
+        #     # plot_club(club, datetime.now(), 2)
+        #     plot_all_clubs(datetime.now(), 7)
+        #     context.bot.send_photo(chat_id=update.message.chat_id, photo=open('fff-summary.png', 'rb'))
+
+    elif update.message.text == 'ThisMonth':
+        first_to_this_month = datetime.today().replace(day=1).date()
+        today = datetime.today().date()
+        days_diff = (today - first_to_this_month).days
+        plot_all_clubs(datetime.now(), days_diff)
+
+    else:
+        print ('unknown error occured.')
+
+    context.bot.send_photo(chat_id=update.message.chat_id, photo=open('summary.png', 'rb'))
+
+    # for club in clubs:
+    #     last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
+    #     # plot_club(club, datetime.now(), 2)
+    #     plot_all_clubs(datetime.now(), 2)
+    #     context.bot.send_photo(chat_id=update.message.chat_id, photo=open('fff-summary.png', 'rb'))
+
+    update.message.reply_text('reports done. press /start to start again\n')
+    return ConversationHandler.END
+
+    # return
 
 
 def action(update, context):
@@ -221,6 +297,7 @@ def end(update, context):
 def cancel(update, context):
     user = update.message.from_user
     logger.info("User %s canceled the conversation.", user.first_name)
+
     update.message.reply_text('Bye! I hope we can talk again some day.',
                               reply_markup=ReplyKeyboardRemove())
 
@@ -249,11 +326,8 @@ def main():
         entry_points=[CommandHandler('start', start)],
 
         states={
-            # CLUB: [MessageHandler(Filters.all, club)],
             CLUB: [MessageHandler(Filters.text(clubs + action_buttons), club)],
-
-            # ACTION: [MessageHandler(Filters.all, action),
-            #          CommandHandler('skip', skip_action)],
+            REPORTS: [MessageHandler(Filters.text(['All', 'Last7Days', 'ThisMonth']), reports)],
             ACTION: [MessageHandler(Filters.text(['update', 'cancel']), action),
                      CommandHandler('skip', skip_action)],
 
