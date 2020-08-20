@@ -184,16 +184,16 @@ def reports(update, context):
         first_record = datetime(2020, 8, 15).date()
         today = datetime.today().date()
         days_diff = (today - first_record).days
-        plot_all_clubs(datetime.now(), days_diff)
+        plot_all_clubs(datetime.now().date(), days_diff)
 
     elif update.message.text == 'Last7Days':
-        plot_all_clubs(datetime.now(), 7)
+        plot_all_clubs(datetime.now().date(), 7)
 
     elif update.message.text == 'ThisMonth':
         first_to_this_month = datetime.today().replace(day=1).date()
         today = datetime.today().date()
         days_diff = (today - first_to_this_month).days
-        plot_all_clubs(datetime.now(), days_diff)
+        plot_all_clubs(datetime.now().date(), days_diff)
 
     else:
         print ('unknown error occured.')
@@ -235,7 +235,7 @@ def balance(update, context):
 
     logger.info("adding record. [club: {}, balance: {}] (old-balance: {})".format(old_record.club, new_balance,
                                                                                   old_record.balance))
-    new_record = Record.create(club=old_record.club, type='update', date=datetime.now(), balance=new_balance)
+    new_record = Record.create(club=old_record.club, type='update', date=datetime.now().date(), balance=new_balance)
     new_record.save()
 
     message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(new_record.club,

@@ -13,7 +13,7 @@ class Record(Model):
     club = CharField()
     type = CharField()
     # date = DateField()
-    date = DateTimeField(default=datetime.now)
+    date = DateField(default=datetime.now().date())
     balance = IntegerField()
 
     class Meta:
@@ -29,7 +29,9 @@ def inject_records(file):
         r = record.split('|')
         r_club = r[1]
         r_type = r[2]
-        r_date = datetime.strptime(r[3].split('.')[0], '%Y-%m-%d %H:%M:%S')
+        # r_date = datetime.strptime(r[3].split('.')[0], '%Y-%m-%d %H:%M:%S')
+        r_date = datetime.strptime(r[3], '%Y-%m-%d')
+
         r_balance = r[4]
         r = Record.create(club=r_club, type=r_type, date=r_date, balance=r_balance)
         r.save()
