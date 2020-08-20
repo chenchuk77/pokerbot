@@ -20,6 +20,26 @@ class Record(Model):
         database = db  # This model uses the "poker.db" database.
 
 
+class Deposit(Model):
+    club = CharField()
+    type = CharField()
+    date = DateField(default=datetime.now().date())
+    amount = IntegerField()
+
+    class Meta:
+        database = db  # This model uses the "poker.db" database.
+
+
+class Withdraw(Model):
+    club = CharField()
+    type = CharField()
+    date = DateField(default=datetime.now().date())
+    amount = IntegerField()
+
+    class Meta:
+        database = db  # This model uses the "poker.db" database.
+
+
 # inject file of real records that created by the show-records.sh script
 def inject_records(file):
     records = open(file).readlines()
@@ -61,14 +81,15 @@ def recreate_db():
         before use this, make sure to execute ./db-backup.sh
         to save the current records and inject them upon start.
        """
-    db.create_tables([Record])
+    db.create_tables([Record, Deposit, Withdraw])
     inject_records('db-init')
     #inject_test_records()
 
 
 def init():
     db.connect()
-    #recreate_db()
+    # recreate_db()
+
 
 def generate_series(start_value, type='random'):
     if type not in ['win', 'lose', 'random']:

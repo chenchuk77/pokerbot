@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from db import Record
+from db import Record, Deposit, Withdraw
 from prettytable import PrettyTable
 
 import logging
@@ -39,16 +39,15 @@ logger = logging.getLogger(__name__)
 # States
 CLUB, REPORTS, ACTION, BALANCE, END = range(5)
 
-clubs1 = ['ultimate', 'poker247', 'lionking']
-clubs2 = ['monkeys', 'dragonball', 'academy']
-clubs3 = ['poxi', '7xl', 'pokernuts']
-clubs = clubs1 + clubs2 + clubs3
+clubs1 = ['7xl', 'pokernuts', 'poxi', 'cardhouse']
+clubs2 = ['ultimate', 'poker247', 'lionking', 'monkeys', 'dragonball', 'academy']
+clubs = clubs1 + clubs2
 
 action_buttons = ['summary', 'reports']
 
 
 def start(update, context):
-    reply_keyboard = [clubs1, clubs2, clubs3, action_buttons]
+    reply_keyboard = [clubs1, clubs2, action_buttons]
     update.message.reply_text(
         'Choose a club to update balance:\n\n',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
@@ -64,7 +63,7 @@ def get_club_balances(club_name, until, days_count):
         #     (Record.club == club_name) & (Record.date <= since.date() - timedelta(days=1))).order_by(Record.date).execute()[
         #     0].balance
         last_balance = Record.select(Record.balance).where(
-            (Record.club == club_name) & (Record.date <= since.date() + timedelta(days=1))).order_by(
+            (Record.club == club_name) & (Record.date <= since + timedelta(days=1))).order_by(
             Record.date).execute()[
             0].balance
         return last_balance
@@ -76,7 +75,7 @@ def get_club_balances(club_name, until, days_count):
 
     # create an empty list of strings for all dates in range
     all_dates = []
-    for single_date in daterange(since.date(), until.date()+timedelta(days=1)):
+    for single_date in daterange(since, until+timedelta(days=1)):
         #print(single_date.strftime("%Y-%m-%d"))
 
         all_dates.append(single_date.strftime("%Y-%m-%d"))
@@ -89,7 +88,8 @@ def get_club_balances(club_name, until, days_count):
         (Record.club == club_name) & (Record.date >= since-timedelta(days=1)) & (Record.date <= until)).order_by(Record.date).execute()
     club_records = list(query)
     for record in club_records:
-        date_string = record.date.date().strftime("%Y-%m-%d")
+        # date_string = record.date.date().strftime("%Y-%m-%d")
+        date_string = str(record.date)
         balances_partial[date_string] = record.balance
 
     # create final dict, filling the missing gaps with last values
@@ -128,7 +128,8 @@ def plot_all_clubs(until, days_count):
 
 def club(update, context):
     reply_keyboard = [
-        ['update', 'cancel']
+        ['update', 'cancel'],
+        ['withdraw', 'deposit']
     ]
     msg = ""
 
@@ -207,10 +208,24 @@ def action(update, context):
     user = update.message.from_user
 
     if update.message.text == 'update':
-        logger.info("update chosen. requesting user amount.")
+        context.user_data['balance_action'] = 'update'
+        logger.info("update chosen for {}. requesting new balance.".format(context.user_data['last_club_record'].club))
         update.message.reply_text(
             'Type the current balance for {}: \n'.format(context.user_data['last_club_record'].club))
         return BALANCE
+
+    elif update.message.text == 'deposit':
+        context.user_data['balance_action'] = 'deposit'
+        logger.info("deposit chosen for {}. requesting amount.".format(context.user_data['last_club_record'].club))
+        update.message.reply_text(
+            'Type the amount deposited to {}: \n'.format(context.user_data['last_club_record'].club))
+        return BALANCE
+
+    elif update.message.text == 'withdraw':
+        context.user_data['balance_action'] = 'withdraw'
+        logger.info("withdraw chosen for {}. requesting amount.".format(context.user_data['last_club_record'].club))
+        return BALANCE
+
     else:
         logger.info("cancel chosen. exiting to BIO.")
         update.message.reply_text('canceled. press /start to start again\n')
@@ -228,23 +243,70 @@ def skip_action(update, context):
 
 def balance(update, context):
     user = update.message.from_user
-    new_balance = update.message.text
+    amount_or_balance = int(update.message.text)
 
-    # get the record from the context
-    old_record = context.user_data['last_club_record']
+    # get the record and action from the context (record is probably needed only for update ...)
+    last_club_record = context.user_data['last_club_record']
+    balance_action = context.user_data['balance_action']
 
-    logger.info("adding record. [club: {}, balance: {}] (old-balance: {})".format(old_record.club, new_balance,
-                                                                                  old_record.balance))
-    new_record = Record.create(club=old_record.club, type='update', date=datetime.now().date(), balance=new_balance)
-    new_record.save()
+    if balance_action == 'update':
+        if datetime.now().date() == last_club_record.date:
+            logger.info("updating today's record. [club: {}, balance: {}] (old-balance: {})".format(last_club_record.club,
+                                                                                          amount_or_balance,
+                                                                                          last_club_record.balance))
 
-    message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(new_record.club,
-                                                                                         str(new_record.date),
-                                                                                         str(new_record.balance))
+            last_club_record.balance = amount_or_balance
+            last_club_record.save
 
-    update.message.reply_text(message)
+        else:
+            logger.info("adding a new record. [club: {}, balance: {}] (old-balance: {})".format(last_club_record.club,
+                                                                                          amount_or_balance,
+                                                                                          last_club_record.balance))
 
-    # return END
+            new_record = Record.create(club=last_club_record.club, type='update', date=datetime.now().date(),
+                                       balance=amount_or_balance)
+            new_record.save()
+
+            message = "Club: {} \nDate: {}\nBalance: {}\n" \
+                      "\npress /start to start again\n".format(new_record.club,
+                                                               str(new_record.date),str(new_record.balance))
+            update.message.reply_text(message)
+
+    elif balance_action == 'deposit':
+        logger.info("adding deposit . [club: {}, deposited: {}]".format(last_club_record.club, amount_or_balance))
+        new_deposit = Deposit.create(club=last_club_record.club, type='deposit', date=datetime.now().date(), 
+                                     amount=amount_or_balance)
+        new_deposit.save()
+
+        logger.info("removing {} from club. [balance was {}],".format(amount_or_balance, last_club_record.balance))
+        last_club_record.balance = last_club_record.balance + amount_or_balance
+        logger.info("new club balance: {}.".format(last_club_record.balance))
+        last_club_record.save()
+
+        message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(last_club_record.club,
+                                                                                             str(last_club_record.date),
+                                                                                             str(last_club_record.balance))
+        update.message.reply_text(message)
+
+    elif balance_action == 'withdraw':
+        logger.info("adding withdraw . [club: {}, withdrawn: {}]".format(last_club_record.club, amount_or_balance))
+        new_withdraw = Withdraw.create(club=last_club_record.club, type='withdrawn', date=datetime.now().date(),
+                                       amount=amount_or_balance)
+        new_withdraw.save()
+
+        logger.info("adding {} to club. [balance was {}],".format(amount_or_balance, last_club_record.balance))
+        last_club_record.balance = last_club_record.balance - amount_or_balance
+        logger.info("new club balance: {}.".format(last_club_record.balance))
+        last_club_record.save()
+
+        message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(last_club_record.club,
+                                                                                             str(last_club_record.date),
+                                                                                             str(last_club_record.balance))
+        update.message.reply_text(message)
+
+    else:
+        print ('unknown error occured.')
+
     return ConversationHandler.END
 
 
@@ -303,7 +365,7 @@ def main():
         states={
             CLUB: [MessageHandler(Filters.text(clubs + action_buttons), club)],
             REPORTS: [MessageHandler(Filters.text(['All', 'Last7Days', 'ThisMonth']), reports)],
-            ACTION: [MessageHandler(Filters.text(['update', 'cancel']), action),
+            ACTION: [MessageHandler(Filters.text(['update', 'cancel', 'deposit', 'withdraw']), action),
                      CommandHandler('skip', skip_action)],
             BALANCE: [MessageHandler(Filters.all, balance),
                       CommandHandler('skip', skip_balance)],
