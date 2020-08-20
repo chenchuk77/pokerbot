@@ -1,4 +1,6 @@
 TODO::
 
 1. fix python table to split date by '.' and not fixed 6 digits - DONE.
-
+2. find first db date dynamically in reports(), instead of hardcoded datetime(2020, 8, 15)
+3. change DB to hold dates only
+4. handle more than 1 record per day ( maybe update last ?)

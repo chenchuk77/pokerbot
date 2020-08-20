@@ -48,3 +48,12 @@ REAL"
 61|poxi|init|2020-08-13 13:22:33.000000|884
 
 
+
+
+    # for club in clubs:
+    #     last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
+    #     # plot_club(club, datetime.now(), 2)
+    #     plot_all_clubs(datetime.now(), 2)
+    #     context.bot.send_photo(chat_id=update.message.chat_id, photo=open('fff-summary.png', 'rb'))
+
+

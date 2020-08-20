@@ -181,28 +181,13 @@ def reports(update, context):
     logger.info("entering state: REPORTS")
 
     if update.message.text == 'All':
-        # TODO: find first record dynamicaly
-        #  last_record = Record.select().order_by(Record.date)[0]
         first_record = datetime(2020, 8, 15).date()
         today = datetime.today().date()
         days_diff = (today - first_record).days
         plot_all_clubs(datetime.now(), days_diff)
-        # plot_all_clubs(datetime.now(), 7)
-        #
-        # for club in clubs:
-        #
-        #     last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
-        #     # plot_club(club, datetime.now(), 2)
-        #     plot_all_clubs(datetime.now(), 7)
 
     elif update.message.text == 'Last7Days':
         plot_all_clubs(datetime.now(), 7)
-
-        # for club in clubs:
-        #     last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
-        #     # plot_club(club, datetime.now(), 2)
-        #     plot_all_clubs(datetime.now(), 7)
-        #     context.bot.send_photo(chat_id=update.message.chat_id, photo=open('fff-summary.png', 'rb'))
 
     elif update.message.text == 'ThisMonth':
         first_to_this_month = datetime.today().replace(day=1).date()
@@ -214,17 +199,8 @@ def reports(update, context):
         print ('unknown error occured.')
 
     context.bot.send_photo(chat_id=update.message.chat_id, photo=open('summary.png', 'rb'))
-
-    # for club in clubs:
-    #     last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
-    #     # plot_club(club, datetime.now(), 2)
-    #     plot_all_clubs(datetime.now(), 2)
-    #     context.bot.send_photo(chat_id=update.message.chat_id, photo=open('fff-summary.png', 'rb'))
-
     update.message.reply_text('reports done. press /start to start again\n')
     return ConversationHandler.END
-
-    # return
 
 
 def action(update, context):
@@ -238,7 +214,6 @@ def action(update, context):
     else:
         logger.info("cancel chosen. exiting to BIO.")
         update.message.reply_text('canceled. press /start to start again\n')
-        # return BIO
         return ConversationHandler.END
 
 
@@ -330,10 +305,8 @@ def main():
             REPORTS: [MessageHandler(Filters.text(['All', 'Last7Days', 'ThisMonth']), reports)],
             ACTION: [MessageHandler(Filters.text(['update', 'cancel']), action),
                      CommandHandler('skip', skip_action)],
-
             BALANCE: [MessageHandler(Filters.all, balance),
                       CommandHandler('skip', skip_balance)],
-
             END: [MessageHandler(Filters.all, end)]
         },
 
