@@ -12,9 +12,9 @@ db = SqliteDatabase('poker.db')
 class Record(Model):
     club = CharField()
     type = CharField()
-    # date = DateField()
     date = DateField(default=datetime.now().date())
-    balance = IntegerField()
+    balance = IntegerField(default=0)
+    profit = IntegerField(default=0)
 
     class Meta:
         database = db  # This model uses the "poker.db" database.

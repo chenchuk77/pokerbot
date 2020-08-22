@@ -1,27 +1,3 @@
-new (profit, balance)
-*** init = init deposit
-
-1|gamrox|init|2020-05-03|0|500
-1|poxi|init|2020-05-15|0|500
-1|dragonball|init|2020-05-15|0|300
-1|poxi|deposit|2020-05-25|-500|500
-1|lionking|init|2020-05-26|0|800
-1|lionking|deposit|2020-06-01|-800|500
-1|jungle|init|2020-07-12|0|800
-1|7xl|init|2020-07-14|0|800
-1|ultimate|init|2020-07-27|750
-1|7xl|deposit|2020-07-31|-800|800
-1|poker247|init|2020-08-04|0|500
-1|lionking|deposit|2020-08-04|-1300|500
-1|poker247|deposit|2020-08-05|-500|300
-1|ultimate|deposit|2020-08-07|-750|300
-
-TODO:// the above is incorrect, no withdraws, need to recalc profit
-
-
-
-----------------
-old:
 1|cardhouse|init|2020-08-15|500
 2|poxi|init|2020-08-15|884
 3|7xl|init|2020-08-15|131
