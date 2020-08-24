@@ -5,3 +5,4 @@ TODO::
 3. change DB to hold dates only
 4. DONE: handle more than 1 record per day ( maybe update last ?)
 5. add profit field to a record
+6. support more than 1 deposit/day

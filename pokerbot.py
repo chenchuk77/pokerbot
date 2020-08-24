@@ -39,9 +39,11 @@ logger = logging.getLogger(__name__)
 # States
 CLUB, REPORTS, ACTION, BALANCE, END = range(5)
 
+
+old_clubs = ['gamrox']
 clubs1 = ['7xl', 'pokernuts', 'poxi', 'cardhouse']
 clubs2 = ['ultimate', 'poker247', 'lionking', 'monkeys', 'dragonball', 'academy']
-clubs = clubs1 + clubs2
+clubs = old_clubs + clubs1 + clubs2
 
 action_buttons = ['summary', 'reports']
 
@@ -58,10 +60,6 @@ def get_club_balances(club_name, until, days_count):
     since = until - timedelta(days=days_count)
 
     def get_last_club_balance():
-        #last_balance = Record.select(Record.balance).where((Record.club == club_name) & (Record.date <= until) & (Record.date >= since-timedelta(days=1))).order_by(Record.date).execute()[0].balance
-        # last_balance = Record.select(Record.balance).where(
-        #     (Record.club == club_name) & (Record.date <= since.date() - timedelta(days=1))).order_by(Record.date).execute()[
-        #     0].balance
         last_balance = Record.select(Record.balance).where(
             (Record.club == club_name) & (Record.date <= since + timedelta(days=1))).order_by(
             Record.date).execute()[
@@ -75,8 +73,8 @@ def get_club_balances(club_name, until, days_count):
 
     # create an empty list of strings for all dates in range
     all_dates = []
-    for single_date in daterange(since, until+timedelta(days=1)):
-        #print(single_date.strftime("%Y-%m-%d"))
+    for single_date in daterange(since, until + timedelta(days=1)):
+        # print(single_date.strftime("%Y-%m-%d"))
 
         all_dates.append(single_date.strftime("%Y-%m-%d"))
         # logger.info("%s will be plotted.", all_dates)
@@ -85,7 +83,8 @@ def get_club_balances(club_name, until, days_count):
     balances_partial = {}
     last = get_last_club_balance()
     query = Record.select().where(
-        (Record.club == club_name) & (Record.date >= since-timedelta(days=1)) & (Record.date <= until)).order_by(Record.date).execute()
+        (Record.club == club_name) & (Record.date >= since - timedelta(days=1)) & (Record.date <= until)).order_by(
+        Record.date).execute()
     club_records = list(query)
     for record in club_records:
         # date_string = record.date.date().strftime("%Y-%m-%d")
@@ -134,7 +133,7 @@ def club(update, context):
     msg = ""
 
     if update.message.text == 'summary':
-        summary(update,context)
+        summary(update, context)
         return ConversationHandler.END
 
     elif update.message.text == 'reports':
@@ -153,9 +152,10 @@ def club(update, context):
         last_club_record = Record.select().where(Record.club == update.message.text).order_by(Record.date.desc()).get()
         context.user_data['last_club_record'] = last_club_record
         logger.info("%s balance: %s. [%s]", update.message.text, last_club_record.balance, last_club_record.date)
-
-        message = "Club: {} \nDate: {}\nBalance: {}\n\n".format(update.message.text, str(last_club_record.date),
-                                                                str(last_club_record.balance))
+        message = "Club: {} \nDate: {}\nProfit: {}\nBalance: {}\n\n".format(update.message.text,
+                                                                            str(last_club_record.date),
+                                                                            str(last_club_record.profit),
+                                                                            str(last_club_record.balance))
         update.message.reply_text(message,
                                   reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
         return ACTION
@@ -197,7 +197,7 @@ def reports(update, context):
         plot_all_clubs(datetime.now().date(), days_diff)
 
     else:
-        print ('unknown error occured.')
+        print('unknown error occured.')
 
     context.bot.send_photo(chat_id=update.message.chat_id, photo=open('summary.png', 'rb'))
     update.message.reply_text('reports done. press /start to start again\n')
@@ -250,42 +250,60 @@ def balance(update, context):
     balance_action = context.user_data['balance_action']
 
     if balance_action == 'update':
+        # change balance (and profit accordingly)
+        change = amount_or_balance - last_club_record.balance
+        new_balance = amount_or_balance
+        old_profit = last_club_record.profit
+        old_balance = last_club_record.balance
+        new_profit = old_profit + change
         if datetime.now().date() == last_club_record.date:
-            logger.info("updating today's record. [club: {}, balance: {}] (old-balance: {})".format(last_club_record.club,
-                                                                                          amount_or_balance,
-                                                                                          last_club_record.balance))
-
-            last_club_record.balance = amount_or_balance
-            last_club_record.save
+            logger.info("updating today's record for club: {}".format(last_club_record.club))
+            logger.info("updating club profit  [old: {} new: {}]".format(old_profit, new_profit))
+            logger.info("updating club balance [old: {} new: {}]".format(old_balance, new_balance))
+            last_club_record.profit = new_profit
+            last_club_record.balance = new_balance
+            last_club_record.save()
+            message = "Club: {} \nDate: {}\nProfit: {}\nBalance: {}\n" \
+                      "\npress /start to start again\n".format(last_club_record.club,
+                                                               str(last_club_record.date),
+                                                               str(last_club_record.profit),
+                                                               str(last_club_record.balance))
 
         else:
-            logger.info("adding a new record. [club: {}, balance: {}] (old-balance: {})".format(last_club_record.club,
-                                                                                          amount_or_balance,
-                                                                                          last_club_record.balance))
-
+            logger.info("adding a new record for club: {}".format(last_club_record.club))
+            logger.info("adding club profit  [old: {} new: {}]".format(old_profit, new_profit))
+            logger.info("adding club balance [old: {} new: {}]".format(old_balance, new_balance))
             new_record = Record.create(club=last_club_record.club, type='update', date=datetime.now().date(),
-                                       balance=amount_or_balance)
+                                       profit=new_profit, balance=new_balance)
             new_record.save()
 
-            message = "Club: {} \nDate: {}\nBalance: {}\n" \
+            message = "Club: {} \nDate: {}\nProfit: {}\nBalance: {}\n" \
                       "\npress /start to start again\n".format(new_record.club,
-                                                               str(new_record.date),str(new_record.balance))
-            update.message.reply_text(message)
+                                                               str(new_record.date),
+                                                               str(new_record.profit),
+                                                               str(new_record.balance))
+        update.message.reply_text(message)
 
     elif balance_action == 'deposit':
         logger.info("adding deposit . [club: {}, deposited: {}]".format(last_club_record.club, amount_or_balance))
-        new_deposit = Deposit.create(club=last_club_record.club, type='deposit', date=datetime.now().date(), 
+        new_deposit = Deposit.create(club=last_club_record.club, type='deposit', date=datetime.now().date(),
                                      amount=amount_or_balance)
         new_deposit.save()
 
-        logger.info("removing {} from club. [balance was {}],".format(amount_or_balance, last_club_record.balance))
-        last_club_record.balance = last_club_record.balance + amount_or_balance
-        logger.info("new club balance: {}.".format(last_club_record.balance))
+        # decrease profit and increase balance when deposit
+        new_balance = last_club_record.balance + amount_or_balance
+        new_profit = last_club_record.profit - amount_or_balance
+        logger.info("updating club profit  [old: {} new: {}]".format(last_club_record.profit, new_profit))
+        logger.info("updating club balance [old: {} new: {}]".format(last_club_record.balance, new_balance))
+        last_club_record.profit = new_profit
+        last_club_record.balance = new_balance
         last_club_record.save()
 
-        message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(last_club_record.club,
-                                                                                             str(last_club_record.date),
-                                                                                             str(last_club_record.balance))
+        message = "Club: {} \nDate: {}\nProfit: {}\nBalance: {}\n\n" \
+                  "press /start to start again\n".format(last_club_record.club,
+                                                         str(last_club_record.date),
+                                                         str(last_club_record.profit),
+                                                         str(last_club_record.balance))
         update.message.reply_text(message)
 
     elif balance_action == 'withdraw':
@@ -294,18 +312,24 @@ def balance(update, context):
                                        amount=amount_or_balance)
         new_withdraw.save()
 
-        logger.info("adding {} to club. [balance was {}],".format(amount_or_balance, last_club_record.balance))
-        last_club_record.balance = last_club_record.balance - amount_or_balance
-        logger.info("new club balance: {}.".format(last_club_record.balance))
+        # increase profit and decrease balance when withdraw
+        new_balance = last_club_record.balance - amount_or_balance
+        new_profit = last_club_record.profit + amount_or_balance
+        logger.info("updating club profit  [old: {} new: {}]".format(last_club_record.profit, new_profit))
+        logger.info("updating club balance [old: {} new: {}]".format(last_club_record.balance, new_balance))
+        last_club_record.profit = new_profit
+        last_club_record.balance = new_balance
         last_club_record.save()
 
-        message = "Club: {} \nDate: {}\nBalance: {}\n\npress /start to start again\n".format(last_club_record.club,
-                                                                                             str(last_club_record.date),
-                                                                                             str(last_club_record.balance))
+        message = "Club: {} \nDate: {}\nProfit: {}\nBalance: {}\n\n" \
+                  "press /start to start again\n".format(last_club_record.club,
+                                                         str(last_club_record.date),
+                                                         str(last_club_record.profit),
+                                                         str(last_club_record.balance))
         update.message.reply_text(message)
 
     else:
-        print ('unknown error occured.')
+        print('unknown error occured.')
 
     return ConversationHandler.END
 
