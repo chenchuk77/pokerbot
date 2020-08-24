@@ -114,9 +114,10 @@ def recreate_db():
     #inject_test_records()
 
 
-def init():
+def init(recreate=False):
     db.connect()
-    recreate_db()
+    if recreate:
+        recreate_db()
 
 
 def generate_series(start_value, type='random'):
@@ -146,4 +147,4 @@ if __name__ == '__main__':
         This file SHOULD NOT run directly, only in case DB should be re-init.
        """
     print("initializing dataset")
-    init()
+    init(recreate=False)

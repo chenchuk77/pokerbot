@@ -15,13 +15,16 @@ bot.
 """
 
 # local python resources
+import os
+import sys
+
 import credentials
-import db
+# import db
 from datetime import datetime, timedelta, time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from db import Record, Deposit, Withdraw
+from db import Record, Deposit, Withdraw, init
 from prettytable import PrettyTable
 
 import logging
@@ -41,7 +44,7 @@ CLUB, REPORTS, ACTION, BALANCE, END = range(5)
 
 
 old_clubs = ['gamrox']
-clubs1 = ['7xl', 'pokernuts', 'poxi', 'cardhouse']
+clubs1 = ['7xl', 'pokernuts', 'poxi', 'kingclubs']
 clubs2 = ['ultimate', 'poker247', 'lionking', 'monkeys', 'dragonball', 'academy']
 clubs = old_clubs + clubs1 + clubs2
 
@@ -370,8 +373,15 @@ def add_daily_record():
 
 
 def main():
-    db.init()
-    logger.info("db initialized. ")
+    if 'DB_INIT' in os.environ:
+        if os.environ['DB_INIT'] == 'TRUE':
+            init(recreate=True)
+            logger.info("db initialized. ")
+            sys.exit(0)
+        else:
+            init(recreate=False)
+            logger.info("db started. ")
+
 
     token = credentials.token
     # Create the Updater and pass it your bot's token.
