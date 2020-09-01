@@ -14,6 +14,11 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
+import pandas as pd
+from pandas.plotting import table
+
+
+
 # local python resources
 import os
 import sys
@@ -43,7 +48,7 @@ logger = logging.getLogger(__name__)
 CLUB, REPORTS, ACTION, BALANCE, END = range(5)
 
 
-old_clubs = ['gamrox']
+old_clubs = ['gamrox', 'jungle']
 clubs1 = ['7xl', 'pokernuts', 'poxi', 'kingclubs']
 clubs2 = ['ultimate', 'poker247', 'lionking', 'monkeys', 'dragonball', 'academy']
 clubs = old_clubs + clubs1 + clubs2
@@ -108,9 +113,22 @@ def get_club_balances(club_name, until, days_count):
 
 # plot a given dict of balances (club / summary)
 def plot_balances(title, balances_dict):
-    plt.plot(*zip(*balances_dict.items()))
-    # plt.show()
-    plt.savefig('summary.png'.format(title))
+    print(plt.style.available)
+    plt.clf()  # clear
+    plt.style.use('Solarize_Light2')
+    plt.rcParams["figure.figsize"] = [30, 10]
+    plt.rcParams['xtick.labelsize'] = 20
+    plt.rcParams['ytick.labelsize'] = 20
+    plt.rcParams['date.autoformatter.month'] = '%Y-%m'
+    plt.xticks(rotation=90)
+    fig, ax = plt.subplots()
+    ax.plot(*zip(*balances_dict.items()))
+    ax.set(xlabel='Dates',
+           ylabel='Profit (ILS)',
+           xmargin=0.000001,
+           title='Profit summary')
+    ax.grid()
+    fig.savefig("summary.png")
 
 
 # plot specific club
@@ -168,10 +186,10 @@ def summary(update, context):
     logger.info("non state function summary() called.")
 
     table = PrettyTable()
-    table.field_names = ["Club", "Balance", "Updated"]
+    table.field_names = ["Club", "Balance", "Profit", "Updated"]
     for club in clubs:
         last_record = Record.select().where(Record.club == club).order_by(Record.date.desc())[0]
-        table.add_row([club, last_record.balance, str(last_record.date).split('.')[0]])
+        table.add_row([club, last_record.balance, last_record.profit, str(last_record.date).split('.')[0]])
         # plot_club(club, datetime.now(), 2)
         # plot_all_clubs(datetime.now(), 2)
     message = "```" + str(table) + "```"
@@ -185,7 +203,7 @@ def reports(update, context):
     logger.info("entering state: REPORTS")
 
     if update.message.text == 'All':
-        first_record = datetime(2020, 8, 15).date()
+        first_record = datetime(2020, 3, 1).date()
         today = datetime.today().date()
         days_diff = (today - first_record).days
         plot_all_clubs(datetime.now().date(), days_diff)
