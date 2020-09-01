@@ -329,7 +329,7 @@ def balance(update, context):
 
     elif balance_action == 'withdraw':
         logger.info("adding withdraw . [club: {}, withdrawn: {}]".format(last_club_record.club, amount_or_balance))
-        new_withdraw = Withdraw.create(club=last_club_record.club, type='withdrawn', date=datetime.now().date(),
+        new_withdraw = Withdraw.create(club=last_club_record.club, type='withdraw', date=datetime.now().date(),
                                        amount=amount_or_balance)
         new_withdraw.save()
 
