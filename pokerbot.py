@@ -49,30 +49,31 @@ CLUB, REPORTS, ACTION, BALANCE, END = range(5)
 
 
 old_clubs = ['gamrox', 'jungle']
-clubs1 = ['7xl', 'pokernuts', 'poxi', 'kingclubs']
-clubs2 = ['ultimate', 'poker247', 'lionking', 'monkeys', 'dragonball', 'academy']
-clubs = old_clubs + clubs1 + clubs2
+clubs1 = ['7xl', 'pokernuts', 'poxi', 'academy']
+clubs2 = ['ultimate', 'poker247', 'lionking', 'monkeys']
+clubs3 = ['dragonball', 'riviera', 'haverim']
+clubs = old_clubs + clubs1 + clubs2 + clubs3
 
 action_buttons = ['summary', 'reports']
 
 
 def start(update, context):
-    reply_keyboard = [clubs1, clubs2, action_buttons]
+    reply_keyboard = [clubs1, clubs2, clubs3, action_buttons]
     update.message.reply_text(
         'Choose a club to update balance:\n\n',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return CLUB
 
 
-def get_club_balances(club_name, until, days_count):
+def get_club_profits(club_name, until, days_count):
     since = until - timedelta(days=days_count)
 
-    def get_last_club_balance():
-        last_balance = Record.select(Record.balance).where(
-            (Record.club == club_name) & (Record.date <= since + timedelta(days=1))).order_by(
-            Record.date).execute()[
-            0].balance
-        return last_balance
+    def get_last_club_profit():
+        last_profit = Record.select(Record.profit).where(
+            (Record.club == club_name) & (Record.date <= since )).order_by(
+            Record.date.desc()).execute()[
+            0].profit
+        return last_profit
 
     # generates all dates in a range
     def daterange(start_date, end_date):
@@ -89,7 +90,7 @@ def get_club_balances(club_name, until, days_count):
 
     # create dict with balances from existing records only
     balances_partial = {}
-    last = get_last_club_balance()
+    last = get_last_club_profit()
     query = Record.select().where(
         (Record.club == club_name) & (Record.date >= since - timedelta(days=1)) & (Record.date <= until)).order_by(
         Record.date).execute()
@@ -97,7 +98,11 @@ def get_club_balances(club_name, until, days_count):
     for record in club_records:
         # date_string = record.date.date().strftime("%Y-%m-%d")
         date_string = str(record.date)
-        balances_partial[date_string] = record.balance
+        # balances_partial[date_string] = record.balance
+        balances_partial[date_string] = record.profit
+
+    print('partial for ', club_name)
+    print(balances_partial)
 
     # create final dict, filling the missing gaps with last values
     all_balances = {}
@@ -111,8 +116,8 @@ def get_club_balances(club_name, until, days_count):
     return all_balances
 
 
-# plot a given dict of balances (club / summary)
-def plot_balances(title, balances_dict):
+# plot a given dict of profits (club / summary)
+def plot_profits(title, profits_dict):
     print(plt.style.available)
     plt.clf()  # clear
     plt.style.use('Solarize_Light2')
@@ -122,7 +127,7 @@ def plot_balances(title, balances_dict):
     plt.rcParams['date.autoformatter.month'] = '%Y-%m'
     plt.xticks(rotation=90)
     fig, ax = plt.subplots()
-    ax.plot(*zip(*balances_dict.items()))
+    ax.plot(*zip(*profits_dict.items()))
     ax.set(xlabel='Dates',
            ylabel='Profit (ILS)',
            xmargin=0.000001,
@@ -133,17 +138,27 @@ def plot_balances(title, balances_dict):
 
 # plot specific club
 def plot_club(club, until, days_count):
-    balances = get_club_balances(club, until, days_count)
-    plot_balances(club, balances)
+    profits = get_club_profits(club, until, days_count)
+    plot_profits(club, profits)
 
 
 # summarize a list of dict values
 def plot_all_clubs(until, days_count):
-    all_balances = []
+    print ('plotting summary for {} days until {}.'.format(days_count, until))
+    all_profits = []
     for club in clubs:
-        all_balances.append(get_club_balances(club, until, days_count))
-    summary_balances = {k: sum(d[k] for d in all_balances) for k in all_balances[0]}
-    plot_balances('summary', summary_balances)
+        all_profits.append(get_club_profits(club, until, days_count))
+    summary_profits = {k: sum(d[k] for d in all_profits) for k in all_profits[0]}
+    logger.info("summary profits: {}".format(summary_profits))
+
+    starting_profit = summary_profits[list(summary_profits.keys())[0]]
+    relative_profits = {date: profit - starting_profit for date, profit in summary_profits.items()}
+    logger.info("relative profits: {}".format(relative_profits))
+
+    # logger.info("relative profits: {}".format(relative_profits))
+
+    plot_profits('summary', relative_profits)
+    # plot_profits('summary', summary_profits)
 
 
 def club(update, context):
@@ -159,8 +174,10 @@ def club(update, context):
 
     elif update.message.text == 'reports':
         reply_keyboard = [
-            ['Last7Days', 'ThisMonth', 'All']
+                ['Last7Days', 'Last30Days'],
+                ['ThisMonth', 'All']
         ]
+
         update.message.reply_text(
             'choose report dates:\n\n',
             reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
@@ -210,6 +227,9 @@ def reports(update, context):
 
     elif update.message.text == 'Last7Days':
         plot_all_clubs(datetime.now().date(), 7)
+
+    elif update.message.text == 'Last30Days':
+        plot_all_clubs(datetime.now().date(), 30)
 
     elif update.message.text == 'ThisMonth':
         first_to_this_month = datetime.today().replace(day=1).date()
@@ -416,7 +436,7 @@ def main():
 
         states={
             CLUB: [MessageHandler(Filters.text(clubs + action_buttons), club)],
-            REPORTS: [MessageHandler(Filters.text(['All', 'Last7Days', 'ThisMonth']), reports)],
+            REPORTS: [MessageHandler(Filters.text(['All', 'Last7Days', 'Last30Days', 'ThisMonth']), reports)],
             ACTION: [MessageHandler(Filters.text(['update', 'cancel', 'deposit', 'withdraw']), action),
                      CommandHandler('skip', skip_action)],
             BALANCE: [MessageHandler(Filters.all, balance),
