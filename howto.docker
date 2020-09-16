@@ -1,0 +1,2 @@
+docker build -t chenchuk/pokerbot:1.0 .
+docker run -d --name pokerbot chenchuk/pokerbot:1.0
