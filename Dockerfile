@@ -1,7 +1,9 @@
 FROM python:3
+MAINTAINER Chen Alkabets "chenchuk@gmail.com"
 
-ADD test.py /
-COPY pokerbot.py db.py poker.db credentials.py requirements.txt /
+COPY ./app/requirements.txt /requirements.txt
 RUN pip install -r requirements.txt
 
+WORKDIR /app
 CMD [ "python", "./pokerbot.py" ]
+

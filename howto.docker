@@ -1,2 +1,19 @@
+# 
+# Docker provides a stateless python runtime environment preconfigured with all dependencies.
+# the python bot code and the data are shared with the host and is permanent on the host
+# when the stateless container removed.
+#
+
+
+# build pokerbot (use when new dependencies needed)
 docker build -t chenchuk/pokerbot:1.0 .
-docker run -d --name pokerbot chenchuk/pokerbot:1.0
+
+# start pokerbot
+docker run --rm --name=pokerbot -d -v $(readlink -f app):/app chenchuk/pokerbot:1.0
+
+# stop pokerbot
+docker stop pokerbot
+
+# realtime logs (container stdout)
+docker logs -f pokerbot
+

@@ -7,3 +7,5 @@ TODO::
 5. DONE: add profit field to a record
 6. DONE: support more than 1 deposit/day
 7. add message to request balace when user do 'withdraw'
+8. fix ./scripts folder. all scripts inside should be relative, also maybe shared with container ??? (if recreate runs from docker also) dont know yet
+
