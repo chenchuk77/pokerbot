@@ -1,1 +1,1 @@
-sqlite3 app/poker.db 'select * from withdraw'
+sqlite3 ../app/poker.db 'select * from withdraw'

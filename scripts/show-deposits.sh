@@ -1,1 +1,1 @@
-sqlite3 app/poker.db 'select * from deposit'
+sqlite3 ../app/poker.db 'select * from deposit'

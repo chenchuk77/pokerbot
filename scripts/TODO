@@ -1,1 +1,9 @@
 fix script paths !!!
+
+1. add reports for withdraw and deposits ( with summaries )
+2. fix withdraw message when withdraw ( no message , should be like deposit)
+3. fix kb input error
+4. make HOME button to cancel operation and go back to main menu
+5. add notes to clubs (like when they own money, to track when chips was taken already)
+6. integrate into systemd
+7. 

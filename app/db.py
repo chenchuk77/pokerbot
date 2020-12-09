@@ -108,9 +108,9 @@ def recreate_db():
         to save the current records and inject them upon start.
        """
     db.create_tables([Record, Deposit, Withdraw])
-    inject_records('db-init-records')
-    inject_deposits('db-init-deposits')
-    inject_withdraws('db-init-withdraws')
+    inject_records('../scripts/db-init-records')
+    inject_deposits('../scripts/db-init-deposits')
+    inject_withdraws('../scripts/db-init-withdraws')
     #inject_test_records()
 
 

@@ -1,1 +1,1 @@
-sqlite3 app/poker.db
+sqlite3 ../app/poker.db

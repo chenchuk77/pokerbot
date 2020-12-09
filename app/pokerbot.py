@@ -51,7 +51,7 @@ CLUB, REPORTS, ACTION, BALANCE, END = range(5)
 old_clubs = ['gamrox', 'jungle']
 clubs1 = ['7xl', 'pokernuts', 'poxi', 'academy']
 clubs2 = ['ultimate', 'poker247', 'lionking', 'monkeys']
-clubs3 = ['dragonball', 'riviera', 'haverim']
+clubs3 = ['dragonball', 'riviera', 'haverim', 'allstar']
 clubs = old_clubs + clubs1 + clubs2 + clubs3
 
 action_buttons = ['summary', 'reports']
